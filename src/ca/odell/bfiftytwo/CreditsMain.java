@@ -94,9 +94,9 @@ public class CreditsMain {
 		panel.setBackground(Color.WHITE);
 		frame.getContentPane().add(panel, BorderLayout.CENTER);
 		GridBagLayout gbl_panel = new GridBagLayout();
-		gbl_panel.columnWidths = new int[]{0, 0, 0, 0, 0};
+		gbl_panel.columnWidths = new int[]{0, 0, 0, 0, 0, 0};
 		gbl_panel.rowHeights = new int[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-		gbl_panel.columnWeights = new double[]{0.0, 1.0, 1.0, 0.0, Double.MIN_VALUE};
+		gbl_panel.columnWeights = new double[]{0.0, 1.0, 1.0, 0.0, 0.0, Double.MIN_VALUE};
 		gbl_panel.rowWeights = new double[]{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, Double.MIN_VALUE};
 		panel.setLayout(gbl_panel);
 		
@@ -120,7 +120,7 @@ public class CreditsMain {
 		JLabel label_1 = new JLabel(" ");
 		GridBagConstraints gbc_label_1 = new GridBagConstraints();
 		gbc_label_1.insets = new Insets(0, 0, 5, 0);
-		gbc_label_1.gridx = 3;
+		gbc_label_1.gridx = 4;
 		gbc_label_1.gridy = 0;
 		panel.add(label_1, gbc_label_1);
 		
@@ -288,6 +288,105 @@ public class CreditsMain {
 		gbc_btnRefresh.gridx = 2;
 		gbc_btnRefresh.gridy = 12;
 		panel.add(btnRefresh, gbc_btnRefresh);
+		
+		JButton btnPartials = new JButton("Partials");
+		btnPartials.addActionListener(new ActionListener() {
+			
+			
+			/*****PARTIALS*****/
+			public void actionPerformed(ActionEvent e) {
+				
+				
+				
+				try{
+					
+					
+					Vector<Northbound> v = getReturnCandidatesPartial();
+					//iterate through candidates and set params one by one
+					//orderReturnCandidatesByOrderID(v);
+					
+					//Hashtable<String,Vector<Northbound>> h = orderReturnCandidatesByOrderID(v);
+					
+					Vector<EdifactData> ediV =  createEdifactDatasPartial( v );
+					
+					
+					//saveReturnCandidates(ediV);
+					
+					
+					
+				}catch(Exception e1 ){
+					e1.printStackTrace();
+				}
+				
+				
+				
+			}
+		});
+		btnPartials.setFont(new Font("Lucida Grande", Font.BOLD | Font.ITALIC, 15));
+		GridBagConstraints gbc_btnPartials = new GridBagConstraints();
+		gbc_btnPartials.insets = new Insets(0, 0, 0, 5);
+		gbc_btnPartials.gridx = 3;
+		gbc_btnPartials.gridy = 12;
+		panel.add(btnPartials, gbc_btnPartials);
+	}
+	
+	
+	
+	//createEdifactDatasPartial
+	
+	/*
+	 * 
+	 */
+	protected Vector<EdifactData> createEdifactDatasPartial( Vector<Northbound> v )  throws Exception{
+		
+		Iterator<Northbound> i = v.iterator();
+		Hashtable<String,EdifactData> h = new Hashtable<String,EdifactData>();
+		
+		EdifactData ed = null;
+		Northbound nb  = null;
+		Vector<EdifactData> edifactVector = new Vector<EdifactData>();
+		String fenixccno = null;
+		String nborderId = null;
+		
+		while( i.hasNext()  ){
+			
+			ed = new EdifactData();
+			nb = i.next();
+			
+			//all the north bound parcels in the order
+			
+			
+			ed.setDocumentNumber( generateDocumentNumber( nb ) );
+			ed.setAdjustmentNumber( generateAdjustmentNumber() );
+			ed.setShipmentNumber( nb.getORDER_ID() );
+			ed.setDutyPaidDate( getDutyPaidDate( nb )  );
+			ed.setExportDate(getFenixExportFromDatabase(nb));
+			ed.setExportCompanyIdentification("BORDFR");
+			ed.setPowerOfAttorneyIndicator("1");
+			ed.setImporterFirstName( getImporterFirstName( nb ) );
+			ed.setImporterLastName( getImporterLastName( nb ) );
+			ed.setImportAddress(getImporterAddress( nb ));
+			ed.setCity( getImporterCity( nb ) );
+			ed.setPostalcode( getImporterPostalCode(nb) );
+			ed.setProvince( getImporterProvince( ed.getPostalcode() )  );
+			ed.setCountry("CA");
+			ed.setDuty( getDuty(nb) );
+			ed.setExciseDuty("0");
+			ed.setExciseTax("0");
+			ed.setGST( getGST( nb ) );
+			ed.setPST( getPST( nb, ed.getProvince() ) );
+			ed.setTRACKING_NO( nb.getTRACKING_NO() );
+			
+			System.out.println("ed: " + ed.generateLines() );
+			
+			//updateNorthBound(nb.getORDER_ID() );
+			//saveEdifact(ed );
+			
+			
+			
+		}
+		
+		return edifactVector;
 	}
 	
 	//createEdifactDatas
@@ -1227,6 +1326,73 @@ protected void saveEdifact( EdifactData ed ) throws Exception {
 		return order_IDLabel;
 	}
 	
+	//
+private Vector<Northbound> getReturnCandidatesPartial() throws Exception {
+		
+		
+		Vector<Northbound> v = new Vector<Northbound>();
+		
+		//go to southbound file and get all full return order_ids
+		
+		Hashtable<String,String> parcel_ids = new Hashtable<String,String>(); 
+		
+		Vector<String> v1 = getSouthboundPartial();
+		
+		System.out.println("southbound PARTIAL size: " + v1.size() );
+		
+		//go to northbound table and get the data objects by order_id
+		//each northbound entry is unique by internal_parcel_id
+		Vector<Northbound> v2 = getNorthbound( v1 );
+		System.out.println("northbound size: " + v2.size() );
+		
+		//go to the fenix table into RAM
+		
+		Hashtable<String,String> h1 = getFenixData();
+		System.out.println("Fenix size: " + h1.size() );
+		//go through north bound list and match 
+		//the NORTHBOUND tracking_no to the FENIX CCNO
+		
+		Iterator<Northbound> inb = v2.iterator();
+		
+		int count = 0;
+		EdifactData ed = null;
+		Northbound nb = null;
+		String fenixccno = null;
+		
+		
+		
+		while(inb.hasNext()){
+			
+			nb = inb.next();
+			fenixccno = h1.get ( nb.getTRACKING_NO()  ) ;
+			
+			//check the fenix hashtable
+			if(  fenixccno !=null ){
+				
+				//System.out.println("match!!!$$$$$");
+				//each nb is unique against INTERNAL_PARCEL_ID
+				nb.setFENIX_CCNO( fenixccno );	
+				v.add(nb);
+				count++;
+				
+			}
+			
+			
+			
+		}
+		
+		System.out.println("match count: " + count );
+		//save return candiates
+		
+		
+		
+		//display
+		
+		
+		return v; 
+		
+	}
+	
 	private Vector<Northbound> getReturnCandidates() throws Exception {
 		
 		
@@ -1399,7 +1565,7 @@ protected void saveEdifact( EdifactData ed ) throws Exception {
 				nb.setINTERNAL_PARCEL_ID(rs.getString("INTERNAL_PARCEL_ID"));
 				nb.setTRACKING_NO(rs.getString("TRACKING_NO"));
 				nb.setSHIP_DATE(rs.getString("SHIP_DATE"));
-				
+				System.out.println(nb.getTRACKING_NO() );
 				//System.out.println("get nb adding...");
 				v.add(nb);
 			}
@@ -1431,6 +1597,34 @@ private void updateNorthBound( String order_id ) throws SQLException {
 		
 	
 	}
+
+private Vector<String> getSouthboundPartial() throws SQLException {
+	
+	Vector<String> v = new Vector<String>();
+	PreparedStatement pstmt;
+	ResultSet rs;
+	String ORDER_ID  = null;
+	
+	
+	Connection conn = getConnection();
+	
+	pstmt = conn.prepareStatement("select * From southbound where FWD_RTN_SAME_YN = ? " );
+	pstmt.setString(1, "N");
+	rs = pstmt.executeQuery();
+	
+	while(rs.next() ){
+		
+		ORDER_ID = new String( rs.getString("ORDER_ID") );
+		
+		v.add(ORDER_ID);
+	}
+	
+	pstmt.close();
+	rs.close();
+	conn.close();
+	
+	return v;
+}
 	
 	private Vector<String> getSouthboundFull() throws SQLException {
 		

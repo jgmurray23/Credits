@@ -3,6 +3,7 @@ package ca.odell.bfiftytwo;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.URL;
@@ -31,12 +32,17 @@ public class Upload
         public static String PASS="kw98hjka2b";
         //public static String UPLOAD_URL="https://dhl.candata.com/transfer/upload?name=CREDITS"; 
         //public static String UPLOAD_URL="https://dhl.candata.com/transfer/upload?name=CREDITS_TEST"; 
-        public static String hostname = "dhl.candata.com";
+        
+        
+         public static String hostname = "dhl.candata.com";
+         // public static String hostname = "test.candata.com";
 
         public static void main(String args[])
                 throws Exception
         {
         	
+        	
+        		Vector<String>transmitStrings = new Vector<String>();
         	
         		String t1 = "abc";
         	
@@ -49,22 +55,61 @@ public class Upload
         		
         		Iterator<EdifactData> i = v.iterator();
         		EdifactData ed = null;
+        		int counter = 0;
+        		
         		
         		while(i.hasNext() ){ 
         
         			ed = i.next() ;
+        			counter++;
+        			
         			if( !t1.equals(  ed.getTRANSMISSION_NO() ) ){
         			
+        				if(sb.length()> 0){
+        					transmitStrings.add(sb.toString() ) ;
+        				}
+        				
+        				sb = new StringBuffer();
         				sb.append(ed.getTRANSMISSION_NO()  ).append("\n");
         				t1 = ed.getTRANSMISSION_NO();
         				
         			}
-        			sb.append( ed.generateLines()  ).append("\n");
-        		
+        			sb.append( ed.generateLines()  ) ; //.append("\n");
+        			
+        			if( counter < v.size() ){
+        				sb.append("\n");
+        			}
         		
         		}
+        		transmitStrings.add( sb.toString());
         		
-        	
+        		
+        		
+        		Iterator<String> i1 = transmitStrings.iterator();
+        		int filenamecounter = 0 ;
+        		String filename = "filenamenotset";
+        		//String record = null;
+        		
+        		while( i1.hasNext() ){
+        			
+        			filenamecounter++;
+        			
+        			
+        			filename = "filenum_" + String.valueOf(filenamecounter);
+        			
+        			PrintWriter writer = new PrintWriter(filename, "UTF-8");
+        			writer.print( i1.next() );
+        			
+        			writer.close();
+        			
+        			System.out.println("attempting transmit.....");
+        			//System.out.println( "transmit response: " + up.transmit( i1.next() ) );
+        			
+        			
+        		}
+        		
+        		
+        		/*
         		String _hostname_ = InetAddress.getByName(hostname).getCanonicalHostName();
         		
         		//String UPLOAD_URL = "https://"+_hostname_+"/transfer/upload?name=CREDITS_TEST";
@@ -73,9 +118,9 @@ public class Upload
         	
                 URL url = new URL(UPLOAD_URL);
                 HttpsURLConnection con = (HttpsURLConnection)url.openConnection();
-                /*
-                 * This is required or else we do not know what type of message it is and will not process it.
-                 */
+                
+                 //This is required or else we do not know what type of message it is and will not process it.
+                 
                 con.setRequestProperty("Content-type", "text/plain");
                 con.setDoOutput(true);
                 con.setDoInput(true);
@@ -108,8 +153,73 @@ public class Upload
                 con.disconnect();
 
                 System.out.println("Response->\n"+new String(outb.toByteArray()));
+                */
         }
         
+        
+        public String transmit( /*String hostname,*/ String datatosend )  {
+        	
+        	System.out.println("datatosend: "+  "\n" + datatosend );
+        	
+        	String retVal = "";
+        	
+        	try {
+        	
+        	String _hostname_ = InetAddress.getByName(hostname).getCanonicalHostName();
+    		
+    		//String UPLOAD_URL = "https://"+_hostname_+"/transfer/upload?name=CREDITS_TEST";
+    		
+    		String UPLOAD_URL = "https://"+_hostname_+"/transfer/upload?name=CREDITS_TEST";
+    	
+            URL url = new URL(UPLOAD_URL);
+            HttpsURLConnection con = (HttpsURLConnection)url.openConnection();
+            /*
+             * This is required or else we do not know what type of message it is and will not process it.
+             */
+            con.setRequestProperty("Content-type", "text/plain");
+            con.setDoOutput(true);
+            con.setDoInput(true);
+            con.setRequestProperty("Authorization", "Basic " + DatatypeConverter.printBase64Binary((USER + ":" + PASS).getBytes()));
+
+            OutputStream out = con.getOutputStream();
+            //out.write("message goes here".getBytes());
+            //out.write(sb.toString().getBytes() );
+            out.write( datatosend.getBytes() );
+            out.close();
+
+            //System.out.println( datatosend );
+            
+            int res = con.getResponseCode();
+            
+            if(res != HttpURLConnection.HTTP_OK)
+           {
+            	System.out.println("bad reponse: " + res );
+                    throw new Exception("Bad response "+res);
+                    
+            }
+
+            ByteArrayOutputStream outb = new ByteArrayOutputStream();
+            byte buf[] = new byte[10000];
+            InputStream in = con.getInputStream();
+            int siz=0;
+            while((siz=in.read(buf))>0)
+            {
+                    outb.write(buf, 0, siz);
+            }
+            out.close();
+            in.close();
+            con.disconnect();
+            
+            retVal =  new String(outb.toByteArray()) ;
+            
+        	}catch (Exception netException ){
+        		netException.printStackTrace();
+        		
+        	}
+            
+        	return retVal ;
+        	
+        }
 
         
         private void setTranmissionNumbers(Vector<EdifactData> v) throws Exception {
@@ -169,8 +279,6 @@ public class Upload
                 ed.setTRANSMISSION_NO( trans1 + "." + transString  );
             	saveTranmissionNumber(ed);
             }
-            
-            
             
 		}
 
@@ -291,7 +399,7 @@ public class Upload
     	
     		EdifactData ed =null;
     		
-    			pstmt = conn.prepareStatement("select * from EDIFACT where transmitted is null");
+    			pstmt = conn.prepareStatement("select * from EDIFACT where transmitted is null and importerlastname != '' and importerfirstname != '' and importaddress != '' and city !='' ");
     			
     			
     			rs= pstmt.executeQuery();
@@ -307,10 +415,29 @@ public class Upload
     				ed.setExportDate(rs.getDate("exportdate"));
     				ed.setExportCompanyIdentification(rs.getString("exportcompanyidentification"));
     				ed.setPowerOfAttorneyIndicator(rs.getString("powerofAttorneyIndicator"));
+    				//35
     				ed.setImporterFirstName(rs.getString("importerFirstName"));
+    				if( ed.getImporterFirstName().length() > 35   ){
+    					ed.setImporterFirstName(  ed.getImporterFirstName().substring(0,34)     );
+    				}   				
+    				//35
     				ed.setImporterLastName(rs.getString("importerLastName"));
+    				if( ed.getImporterLastName().length() > 35   ){
+    					ed.setImporterLastName(  ed.getImporterLastName().substring(0,34)     );
+    				}
+    				//35
     				ed.setImportAddress(rs.getString("importAddress"));
+    				if( ed.getImportAddress().length() > 35   ){
+    					ed.setImportAddress(  ed.getImportAddress().substring(0,34)     );
+    				}
+    				//20
     				ed.setCity(rs.getString("city"));
+    				if( ed.getCity().length() > 20   ){
+    					System.out.println("####modding address#### " + ed.getCity().substring(0,19) );
+    					ed.setCity(  ed.getCity().substring(0,19)     );
+    				}
+    				
+    				
     				ed.setProvince(rs.getString("province"));
     				ed.setCountry(rs.getString("Country"));
     				ed.setPostalcode(rs.getString("postalcode"));
